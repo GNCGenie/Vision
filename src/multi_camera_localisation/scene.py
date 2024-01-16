@@ -3,7 +3,7 @@ import cv2
 from scipy.spatial.transform import Rotation
 
 # Class to store detected points and the active cameras which have detected them
-class DetectedPoints:
+class Scene:
     def __init__(self, cameras, detector):
         self.points = []
         self.active_cameras = []

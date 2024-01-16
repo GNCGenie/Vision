@@ -1,4 +1,4 @@
-import cv2 as cv
+import cv2
 import numpy as np
 
 # Camera object with methods to grab images and detect aruco markers
@@ -11,13 +11,13 @@ class Camera:
         self.R = np.zeros(3)
         self.t = np.zeros(3)
 
-        self.video_capture = cv.VideoCapture(self.address)
+        self.video_capture = cv2.VideoCapture(self.address)
         assert self.video_capture.isOpened(), f"Error opening video source: {video_source}"
 
     # Method to reload camera
     def reload(self):
         self.video_capture.release()
-        self.video_capture = cv.VideoCapture(self.address)
+        self.video_capture = cv2.VideoCapture(self.address)
 
     # Method to set rotation and translation vectors
     def set_Rt(self, R, t):
@@ -39,7 +39,7 @@ class Camera:
 
     # Project points using camera parameters
     def project(self, points_3d):
-        image_points, _ = cv.projectPoints(points_3d, self.R, self.t, self.K, self.d)
+        image_points, _ = cv2.projectPoints(points_3d, self.R, self.t, self.K, self.d)
         return image_points
 
 # Camera matrix and distortion coefficients
