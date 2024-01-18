@@ -27,9 +27,16 @@ class Scene:
             raise RuntimeError("Not enough cameras detecting the points")
 
         points_3d = []
+        undistorted_2d_points = []
+        for points,active_camera in zip(self.points,self.active_cameras):
+            undistorted_2d_points.append(
+                    cv2.undistortPoints(points, active_camera.K, active_camera.d))
+
         for j in self.active_cameras[1:]:
-            P0 = self.active_cameras[0].K @ np.hstack((self.active_cameras[0].R, self.active_cameras[0].t))
-            P1 = self.active_cameras[j].K @ np.hstack((self.active_cameras[j].R, self.active_cameras[j].t))
+            P0 = self.active_cameras[0].K @ np.hstack((self.active_cameras[0].R,
+                                                       self.active_cameras[0].t))
+            P1 = self.active_cameras[j].K @ np.hstack((self.active_cameras[j].R,
+                                                       self.active_cameras[j].t))
             X = cv2.triangulatePoints(P0, P1, self.points[0].T, self.points[j].T)
             X /= X[3]
             X = X[:3]
