@@ -11,19 +11,5 @@ Computational complexity evolves as O(n^2*k). Where n is the no. of points, k th
 Currently we're testing with 4 aruco markers, for points.
 However as long as any feature is detected by multiple cameras, we just need to change detection.
 
-## Write flow chart for code:
-
-                                       ┌───────────────────┐    ┌─────────────────────┐              ┌─────────────────────┐
-                                       │ Project to 2D     │    │ 3D Points X,Y,Z     ├────────────► │Output               │
-                                       │                   ◄────┤                     │              │                     │
-                                       └──────┬────────────┘    └─────────────────────┘              └─────────────────────┘
-                                              │                            ▲
-┌───────────────────────┐                     │                            │
-│Camera Stream #1       ├──────────┐          │                            │
-├───────────────────────┤          │   ┌──────▼──────────┐      ┌──────────┴──────────┐
-├───────────────────────┤          │   │ Check Deviation │      │Achieve Consensus    │
-│Camera Stream #2       ├──────────┼───┤                 ├─────►│                     │
-├───────────────────────┤          │   │                 │      │(Optimize)           │
-├───────────────────────┤          │   └─────────────────┘      └─────────────────────┘
-│Camera Stream #n       ├──────────┘
-└───────────────────────┘
+# Flow chart for data flow
+.. image:: /_figures/flow_chart.png
