@@ -3,9 +3,9 @@ import sys
 sys.path.insert(0, os.path.abspath('..'))
 sys.path.insert(0, os.path.abspath('../source'))
 
-import sphinx_rtd_theme
+#import sphinx_rtd_theme
 
-html_theme = "sphinx_rtd_theme"
+#html_theme = "sphinx_rtd_theme"
 # -- Project information -----------------------------------------------------
 
 project = 'Vision'
@@ -20,10 +20,10 @@ release = '1.3'
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
-extensions = ["sphinx_rtd_theme",
-              "sphinx.ext.autodoc",
-              "sphinx.ext.coverage",
-              "sphinx.ext.napoleon"]
+#extensions = ["sphinx_rtd_theme",
+#              "sphinx.ext.autodoc",
+#              "sphinx.ext.coverage",
+#              "sphinx.ext.napoleon"]
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
