@@ -6,9 +6,9 @@ import time
 cam = cv2.VideoCapture(0)
 # Set exposure to manual mode
 cam.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.25)
-cam.set(cv2.CAP_PROP_EXPOSURE , 0)
-cam.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+cam.set(cv2.CAP_PROP_EXPOSURE , 1e1)
+cam.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
+cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
 # Set image format to MJPEG
 cam.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
 # Set image format to YUV
