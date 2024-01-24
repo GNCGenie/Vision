@@ -64,15 +64,17 @@ n_points = 4*n_markers
 n_cameras = 3  # Change this to the desired number of cameras
 # Initialize cameras and video captures
 video_captures = []
-fourcc = cv2.VideoWriter_fourcc(*'MJPG')
 for i in range(0, 10):
     cam = cv2.VideoCapture(i)  # Adjust camera indices as needed
     # Capture cam reading error
     if not cam.isOpened():
         continue
-    cam.set(cv2.CAP_PROP_FOURCC, fourcc)
-    cam.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
-    cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
+    cam.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.25)
+    cam.set(cv2.CAP_PROP_EXPOSURE , 0)
+    cam.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+    cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+    # Set image format to MJPEG
+    cam.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
     video_captures.append(cam.read)  # Capture initial frames
     if len(video_captures) == n_cameras:
         break
@@ -83,6 +85,9 @@ def getPoints():
     active_cameras = 0
     for i in range(n_cameras):
         _, image = video_captures[i]()
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        # Carry out auto exposure and contrast
+        # image = cv2.equalizeHist(image)
         pts_i, _, _ = detector.detectMarkers(image)
         if (len(pts_i) == n_markers):
             pts_i = np.concatenate([arr.reshape(-1, 2) for arr in pts_i])
