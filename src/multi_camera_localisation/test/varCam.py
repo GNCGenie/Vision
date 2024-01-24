@@ -15,21 +15,23 @@ ax.set_aspect('equal')
 ax.set_xlabel('X [m]')
 ax.set_ylabel('Y [m]')
 ax.set_zlabel('Z [m]')
-ax.set_xlim(-0.2, 0.2)
-ax.set_ylim(-0.2, 0.2)
-ax.set_zlim(0, 1)
+ax.set_xlim(-2.0, 2.0)
+ax.set_ylim(-2.0, 2.0)
+ax.set_zlim(-2.0, 2.0)
 ax.grid(True)
 # Axis for 2D plotting camera views
 ax2d_cam1 = fig.add_subplot(331)
 ax2d_cam2 = fig.add_subplot(333)
-for ax2d in [ax2d_cam1, ax2d_cam2]:
+ax2d_cam3 = fig.add_subplot(337)
+for ax2d in [ax2d_cam1, ax2d_cam2, ax2d_cam3]:
     ax2d.set_aspect('equal')
     ax2d.set_xlabel('X [pixels]')
     ax2d.set_ylabel('Y [pixels]')
     ax2d.grid(True)
 scatter2d_cam1 = ax2d_cam1.scatter([], [], c='r', marker='o')
 scatter2d_cam2 = ax2d_cam2.scatter([], [], c='r', marker='o')
-scatter2d = [scatter2d_cam1, scatter2d_cam2]
+scatter2d_cam3 = ax2d_cam3.scatter([], [], c='r', marker='o')
+scatter2d = [scatter2d_cam1, scatter2d_cam2, scatter2d_cam3]
 plt.show()  # Show the initial plot
 
 # Aruco dictionary being used for each camera
@@ -59,13 +61,21 @@ def cost_func(var, pts, K, d, n_points, n_cameras):
 # Create lists to hold camera objects and video captures
 n_markers = 4
 n_points = 4*n_markers
-cameras = [0,2,4,6]
-n_cameras = 2  # Change this to the desired number of cameras
-video_captures = []
+n_cameras = 3  # Change this to the desired number of cameras
 # Initialize cameras and video captures
-for i in range(n_cameras):
-    cam = cv2.VideoCapture(cameras[i])  # Adjust camera indices as needed
+video_captures = []
+fourcc = cv2.VideoWriter_fourcc(*'MJPG')
+for i in range(0, 10):
+    cam = cv2.VideoCapture(i)  # Adjust camera indices as needed
+    # Capture cam reading error
+    if not cam.isOpened():
+        continue
+    cam.set(cv2.CAP_PROP_FOURCC, fourcc)
+    cam.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
+    cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
     video_captures.append(cam.read)  # Capture initial frames
+    if len(video_captures) == n_cameras:
+        break
 
 def getPoints():
     ############################################################
@@ -85,7 +95,7 @@ def getPoints():
 alpha = 0.1
 pts = np.zeros((n_points, 2, n_cameras))
 pts_prev = np.zeros((n_points, 2, n_cameras))
-X = np.ones((n_points, 3))/2
+X = np.ones((n_points, 3))
 rvecs = np.zeros((n_cameras, 3))
 tvecs = np.zeros((n_cameras, 3))
 while True:
@@ -102,22 +112,24 @@ while True:
     start_time = time.time()
     solution = least_squares(cost_func, var, method='trf',
                              args=(pts, K, d, n_points, n_cameras),
-                             bounds=(-10,10))
+                             bounds=(-10, 10),
+                             max_nfev=1000)
     print("--- %s seconds ---" % (time.time() - start_time))
     print('Cost = {}'.format(np.linalg.norm(solution.fun)))
-    optimized_var = solution.x
-    if np.isnan(optimized_var).any() or np.isinf(optimized_var).any():
+    optimized_vars = solution.x
+    if np.isnan(optimized_vars).any() or np.isinf(optimized_vars).any():
         continue # If any values in res are NaN or Inf, continue
-    var = optimized_var
+    var = optimized_vars
+
     ############################################################
-    # Recollect X, R, t from var
-    X = var[:n_points * 3].reshape(n_points,3)
+    # Recollect X, rvecs, tvecs from res
+    X = var[:n_points * 3].reshape(n_points, 3)
     rvecs = var[n_points * 3:n_points * 3 + 3 * n_cameras].reshape(-1, 3)
     tvecs = var[n_points * 3 + 3 * n_cameras:].reshape(-1,3)
     print('Mean position of 3D points = {}'.format(np.mean(X, axis=0)))
 
     # Add 2D points from cam1 and cam2 to the plot
-    for i,ax in enumerate([ax2d_cam1, ax2d_cam2]):
+    for i,ax in enumerate([ax2d_cam1, ax2d_cam2, ax2d_cam3]):
         ax.set_xlim(min(pts[:, 0, i]), max(pts[:, 0, i]))
         ax.set_ylim(min(pts[:, 1, i]), max(pts[:, 1, i]))
         # Set new data
