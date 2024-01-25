@@ -12,6 +12,7 @@ Currently we're testing with 4 aruco markers, for points.
 However as long as any feature is detected by multiple cameras, we just need to change detection.
 
 # Flow chart for data flow
+
 .. image:: _figures/flow_chart.png
-    :width: 800px
-    :align: center
+   :width: 400
+   :alt: FlowChart

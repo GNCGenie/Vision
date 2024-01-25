@@ -5,14 +5,13 @@ import time
 
 cam = cv2.VideoCapture(0)
 # Set exposure to manual mode
-cam.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.25)
-cam.set(cv2.CAP_PROP_EXPOSURE , 1e1)
-cam.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
-cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
-# Set image format to MJPEG
+cam.set(cv2.CAP_PROP_AUTO_EXPOSURE, 1)
+cam.set(cv2.CAP_PROP_AUTO_WB, 1)
+cam.set(cv2.CAP_PROP_EXPOSURE , 1e0)
+cam.set(cv2.CAP_PROP_FRAME_WIDTH, 2592)
+cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 1944)
+# Set image format to MJPG/YUYV
 cam.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
-# Set image format to YUV
-#cam.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'YUYV'))
 
 _, image = cam.read()
 # Print details about the captured image
@@ -24,7 +23,7 @@ print('Image channels:', image.ndim)
 while True:
     _, image = cam.read()
     # Convert image to grayscale
-    image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+#    image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     # Carry out auto exposure and contrast
 #    image = cv2.equalizeHist(image)
     # Show the processed image
