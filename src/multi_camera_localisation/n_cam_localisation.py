@@ -5,6 +5,10 @@ import cv2
 from copy import deepcopy
 import time
 
+############################################################
+############################################################
+############################################################
+############################################################
 # Visualize the reconstructed 3D points
 plt.ion()
 fig = plt.figure()
@@ -33,6 +37,10 @@ scatter2d_cam2 = ax2d_cam2.scatter([], [], c='r', marker='o')
 scatter2d_cam3 = ax2d_cam3.scatter([], [], c='r', marker='o')
 scatter2d = [scatter2d_cam1, scatter2d_cam2, scatter2d_cam3]
 plt.show()  # Show the initial plot
+############################################################
+############################################################
+############################################################
+############################################################
 
 # Aruco dictionary being used for each camera
 aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)
@@ -43,20 +51,6 @@ K = np.float32([[1.23637547e+03, 0.00000000e+00, 2.94357998e+02],  # IMX335
                 [0.00000000e+00, 1.22549758e+03, 2.20521015e+02],
                 [0.00000000e+00, 0.00000000e+00, 1.00000000e+00]])
 d = np.float32([-1.5209742, 2.46986782, 0.07634431, 0.07220847, 1.9630171])
-
-# Cost function reprojection
-@staticmethod
-def cost_func(var, pts, K, d, n_points, n_cameras):
-    X = var[:n_points*3].reshape(n_points, 3)
-    rvecs = var[n_points*3:n_points*3+3*n_cameras].reshape(n_cameras, 3)
-    tvecs = var[-3*n_cameras:].reshape(n_cameras, 3)
-
-    rvecs[0] = tvecs[0] = np.zeros(3)
-    err = np.zeros((n_points*2, n_cameras))
-    for i in range(n_cameras):
-        proj = cv2.projectPoints(X, rvecs[i], tvecs[i], K, d)[0].reshape(-1,2)
-        err[:,i] = (proj-pts[:,:,i]).ravel()
-    return err.ravel()
 
 # Create lists to hold camera objects and video captures
 n_markers = 4
@@ -69,12 +63,11 @@ for i in range(0, 10):
     # Capture cam reading error
     if not cam.isOpened():
         continue
-    cam.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.25)
-    cam.set(cv2.CAP_PROP_EXPOSURE , 0)
-    cam.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-    cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
-    # Set image format to MJPEG
     cam.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
+    cam.set(cv2.CAP_PROP_AUTO_EXPOSURE, 1)
+    cam.set(cv2.CAP_PROP_EXPOSURE , 1e2)
+    cam.set(cv2.CAP_PROP_FRAME_WIDTH, 2592)
+    cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 1944)
     video_captures.append(cam.read)  # Capture initial frames
     if len(video_captures) == n_cameras:
         break
@@ -96,6 +89,21 @@ def getPoints():
         else:
             continue
     return pts, active_cameras
+
+@staticmethod
+def cost_func(var, pts, K, d, n_points, n_cameras):
+    ############################################################
+    # Cost function reprojection
+    X = var[:n_points*3].reshape(n_points, 3)
+    rvecs = var[n_points*3:n_points*3+3*n_cameras].reshape(n_cameras, 3)
+    tvecs = var[-3*n_cameras:].reshape(n_cameras, 3)
+
+    rvecs[0] = tvecs[0] = np.zeros(3)
+    err = np.zeros((n_points*2, n_cameras))
+    for i in range(n_cameras):
+        proj = cv2.projectPoints(X, rvecs[i], tvecs[i], K, d)[0].reshape(-1,2)
+        err[:,i] = (proj-pts[:,:,i]).ravel()
+    return err.ravel()
 
 alpha = 0.1
 pts = np.zeros((n_points, 2, n_cameras))
@@ -141,6 +149,6 @@ while True:
         scatter2d[i].set_offsets(pts[:, :, i])
 
     # Add 3D points triangulated to the plot
-    scatter._offsets3d = (X[:,0], X[:,1], X[:,2])  # Update data points
+    scatter._offsets3d = (X[:,0], X[:,1], X[:,2])
     plt.draw()  # Redraw the plot
     plt.pause(0.001)
