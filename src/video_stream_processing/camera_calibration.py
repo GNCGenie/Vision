@@ -5,6 +5,12 @@ def select_img_from_video(video_file, board_pattern, select_all=False, wait_msec
     # Open a video
     video = cv.VideoCapture(video_file)
     assert video.isOpened()
+    video.set(cv.CAP_PROP_FOURCC, cv.VideoWriter_fourcc(*'MJPG')) # Set image format to MJPG/YUYV
+    video.set(cv.CAP_PROP_AUTO_EXPOSURE, 1) # Set exposure to manual mode
+    video.set(cv.CAP_PROP_AUTO_WB, 1)
+    video.set(cv.CAP_PROP_EXPOSURE , 1e2)
+    video.set(cv.CAP_PROP_FRAME_WIDTH, 2592)
+    video.set(cv.CAP_PROP_FRAME_HEIGHT, 1944)
 
     # Select images
     img_select = []

@@ -5,17 +5,62 @@ import cv2
 from copy import deepcopy
 import time
 
+############################################################
+############################################################
+############################################################
+############################################################
+# Visualize the reconstructed 3D points
+plt.ion()
+fig = plt.figure()
+ax = fig.add_subplot(111, projection='3d')
+# Axis for plotting 3D points
+scatter = ax.scatter([], [], [], c='r', marker='o')
+ax.set_aspect('equal')
+ax.set_xlabel('X [m]')
+ax.set_ylabel('Y [m]')
+ax.set_zlabel('Z [m]')
+ax.set_xlim(-2.0, 2.0)
+ax.set_ylim(-2.0, 2.0)
+ax.set_zlim(-0.0, 1.0)
+ax.grid(True)
+# Axis for 2D plotting camera views
+ax2d_cam1 = fig.add_subplot(331)
+ax2d_cam2 = fig.add_subplot(333)
+for ax2d in [ax2d_cam1, ax2d_cam2]:
+    ax2d.set_aspect('equal')
+    ax2d.set_xlabel('X [pixels]')
+    ax2d.set_ylabel('Y [pixels]')
+    ax2d.grid(True)
+scatter2d_cam1 = ax2d_cam1.scatter([], [], c='r', marker='o')
+scatter2d_cam2 = ax2d_cam2.scatter([], [], c='r', marker='o')
+scatter2d = [scatter2d_cam1, scatter2d_cam2]
+plt.show()  # Show the initial plot
+############################################################
+############################################################
+############################################################
+############################################################
+
 # Aruco dictionary being used for each camera
 aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)
 aruco_params = cv2.aruco.DetectorParameters()
 detector = cv2.aruco.ArucoDetector(aruco_dict, aruco_params)
 # Camera matrix and distortion coefficients
-K = np.float32([[1.23637547e+03, 0.00000000e+00, 2.94357998e+02],  # IMX335
-                [0.00000000e+00, 1.22549758e+03, 2.20521015e+02],
-                [0.00000000e+00, 0.00000000e+00, 1.00000000e+00]])
-d = np.float32([-1.5209742, 2.46986782, 0.07634431, 0.07220847, 1.9630171])
+K = np.float32([[2008.103946092011, 0, 1282.248797977388], # IMX335 4K
+                [0, 1994.058216315491, 1068.567637100975],
+                [0, 0, 1]])
+d = np.float32([-0.4509704449450611, 0.2490271613018018, -0.006054363779374283, -0.001358884013979639, -0.08083116341021042])
 cam0 = cv2.VideoCapture(0)
-cam1 = cv2.VideoCapture(3)
+cam0.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
+cam0.set(cv2.CAP_PROP_AUTO_EXPOSURE, 1)
+cam0.set(cv2.CAP_PROP_EXPOSURE , 1e2)
+cam0.set(cv2.CAP_PROP_FRAME_WIDTH, 2592)
+cam0.set(cv2.CAP_PROP_FRAME_HEIGHT, 1944)
+cam1 = cv2.VideoCapture(2)
+cam1.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
+cam1.set(cv2.CAP_PROP_AUTO_EXPOSURE, 1)
+cam1.set(cv2.CAP_PROP_EXPOSURE , 1e2)
+cam1.set(cv2.CAP_PROP_FRAME_WIDTH, 2592)
+cam1.set(cv2.CAP_PROP_FRAME_HEIGHT, 1944)
 
 # Cost function reprojection
 @staticmethod
@@ -35,9 +80,9 @@ def cost_func(var, pts0, pts1, K, d, n_points, n_cameras):
 
 n_points = 16
 n_cameras = 2
-alpha = 0.1
-pts0_avg = np.zeros((n_points, 2))
-pts1_avg = np.zeros((n_points, 2))
+X = np.ones((n_points, 3))
+rvec = np.zeros((3,1))
+tvec = np.zeros((3,1))
 pts = np.zeros((n_points, 2, n_cameras))
 while True:
     ############################################################
@@ -61,16 +106,21 @@ while True:
     else:
         print('Not enough markers detected!', end='\r')
         continue
+    pts[:,:,0] = pts0
+    pts[:,:,1] = pts1
 
     ############################################################
     # Optimization
     ############################################################
-    var = np.zeros(n_points*3+6)
+    var = np.concatenate([X.ravel(), rvec.ravel(), tvec.ravel()])
+#    var = np.zeros(var.shape)
 #    print('Original Cost = {}'.format(np.linalg.norm(cost_func(var, pts0, pts1, K, d, n_points, 2))))
     # Optimize X, R and t to minimize cost_func
     # meausure time taken for optimisation
     start_time = time.time()
-    res = least_squares(cost_func, var, method='lm',
+    res = least_squares(cost_func, var, method='trf',
+                        ftol=1e-19, xtol=1e-19, gtol=1e-19,
+                        bounds=(-10, 10), max_nfev=100,
                         args=(pts0, pts1, K, d, n_points, n_cameras))
     print("--- %s seconds ---" % (time.time() - start_time))
     print('Cost = {}'.format(np.linalg.norm(res.fun)))
@@ -83,6 +133,25 @@ while True:
     X = res.x[:n_points * 3].reshape(n_points,3)
     rvec = res.x[n_points * 3:n_points * 3 + 3].reshape(3,1)
     tvec = res.x[n_points * 3 + 3:n_points * 3 + 6].reshape(3,1)
-    var = res.x
     # Print mean position of 3D points
     print('Mean position of 3D points = {}'.format(np.mean(X, axis=0)))
+
+############################################################
+############################################################
+############################################################
+############################################################
+    # Add 2D points from cam1 and cam2 to the plot
+    for i,ax in enumerate([ax2d_cam1, ax2d_cam2]):
+        ax.set_xlim(min(pts[:, 0, i]), max(pts[:, 0, i]))
+        ax.set_ylim(min(pts[:, 1, i]), max(pts[:, 1, i]))
+        # Set new data
+        scatter2d[i].set_offsets(pts[:, :, i])
+
+    # Add 3D points triangulated to the plot
+    scatter._offsets3d = (X[:,0], X[:,1], X[:,2])
+    plt.draw()  # Redraw the plot
+    plt.pause(0.001)
+############################################################
+############################################################
+############################################################
+############################################################

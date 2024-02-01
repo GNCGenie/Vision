@@ -47,11 +47,10 @@ aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)
 aruco_params = cv2.aruco.DetectorParameters()
 detector = cv2.aruco.ArucoDetector(aruco_dict, aruco_params)
 # Camera matrix and distortion coefficients
-K = np.float32([[1.23637547e+03, 0.00000000e+00, 2.94357998e+02],  # IMX335
-                [0.00000000e+00, 1.22549758e+03, 2.20521015e+02],
-                [0.00000000e+00, 0.00000000e+00, 1.00000000e+00]])
-d = np.float32([-1.5209742, 2.46986782, 0.07634431, 0.07220847, 1.9630171])
-
+K = np.float32([[2008.103946092011, 0, 1282.248797977388], # IMX335 4K
+                [0, 1994.058216315491, 1068.567637100975],
+                [0, 0, 1]])
+d = np.float32([-0.4509704449450611, 0.2490271613018018, -0.006054363779374283, -0.001358884013979639, -0.08083116341021042])
 # Create lists to hold camera objects and video captures
 n_markers = 4
 n_points = 4*n_markers
@@ -90,7 +89,6 @@ def getPoints():
             continue
     return pts, active_cameras
 
-@staticmethod
 def cost_func(var, pts, K, d, n_points, n_cameras):
     ############################################################
     # Cost function reprojection
@@ -105,7 +103,7 @@ def cost_func(var, pts, K, d, n_points, n_cameras):
         err[:,i] = (proj-pts[:,:,i]).ravel()
     return err.ravel()
 
-alpha = 0.1
+alpha = 0.5
 pts = np.zeros((n_points, 2, n_cameras))
 pts_prev = np.zeros((n_points, 2, n_cameras))
 X = np.ones((n_points, 3))
@@ -116,17 +114,19 @@ while True:
     if active_cameras < 2:
         print('Not enough active cameras', end='\r')
         continue
-    pts = alpha * pts + (1 - alpha) * pts_prev
-    pts_prev = pts
+#    pts = alpha * pts + (1 - alpha) * pts_prev
+#    pts_prev = pts
 
     ############################################################
     # Optimization
+#    var = np.ones(n_points*3 + 6*n_cameras)
     var = np.concatenate([X.ravel(), rvecs.ravel(), tvecs.ravel()])
     start_time = time.time()
     solution = least_squares(cost_func, var, method='trf',
-                             args=(pts, K, d, n_points, n_cameras),
-                             bounds=(-10, 10),
-                             max_nfev=1000)
+#                             loss='soft_l1',
+                             ftol=1e-12, xtol=1e-12, gtol=1e-12,
+                             bounds=(-10, 10), max_nfev=100,
+                             args=(pts, K, d, n_points, n_cameras))
     print("--- %s seconds ---" % (time.time() - start_time))
     print('Cost = {}'.format(np.linalg.norm(solution.fun)))
     optimized_vars = solution.x
@@ -141,6 +141,10 @@ while True:
     tvecs = var[n_points * 3 + 3 * n_cameras:].reshape(-1,3)
     print('Mean position of 3D points = {}'.format(np.mean(X, axis=0)))
 
+############################################################
+############################################################
+############################################################
+############################################################
     # Add 2D points from cam1 and cam2 to the plot
     for i,ax in enumerate([ax2d_cam1, ax2d_cam2, ax2d_cam3]):
         ax.set_xlim(min(pts[:, 0, i]), max(pts[:, 0, i]))
@@ -152,3 +156,7 @@ while True:
     scatter._offsets3d = (X[:,0], X[:,1], X[:,2])
     plt.draw()  # Redraw the plot
     plt.pause(0.001)
+############################################################
+############################################################
+############################################################
+############################################################
