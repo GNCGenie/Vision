@@ -1,8 +1,5 @@
-# import the necessary packages
 import cv2
-# construct the argument parser and parse the arguments
 
-# define names of each possible ArUco tag OpenCV supports
 ARUCO_DICT = {
         "DICT_4X4_50": cv2.aruco.DICT_4X4_50,
         "DICT_4X4_100": cv2.aruco.DICT_4X4_100,
@@ -55,19 +52,3 @@ while True:
         key = cv2.waitKey()
     if key == 27: # ESC
         break
-
-# image = cv2.imread(args["image"])
-# image = imutils.resize(image, width=600)
-# # loop over the types of ArUco dictionaries
-# for (arucoName, arucoDict) in ARUCO_DICT.items():
-#     # load the ArUCo dictionary, grab the ArUCo parameters, and
-#     # attempt to detect the markers for the current dictionary
-    
-#     arucoDict = cv2.aruco.getPredefinedDictionary(arucoDict)
-#     arucoParams = cv2.aruco.DetectorParameters()
-#     detector = cv2.aruco.ArucoDetector(arucoDict, arucoParams)
-#     (corners, ids, rejected) = detector.detectMarkers(image)
-#     # if at least one ArUco marker was detected display the ArUco name to our terminal
-#     if len(corners) > 0:
-#         print("[INFO] detected {} markers for '{}'".format(
-#             len(corners), arucoName))

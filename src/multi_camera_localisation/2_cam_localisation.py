@@ -113,14 +113,11 @@ while True:
     # Optimization
     ############################################################
     var = np.concatenate([X.ravel(), rvec.ravel(), tvec.ravel()])
-#    var = np.zeros(var.shape)
-#    print('Original Cost = {}'.format(np.linalg.norm(cost_func(var, pts0, pts1, K, d, n_points, 2))))
-    # Optimize X, R and t to minimize cost_func
-    # meausure time taken for optimisation
+    var = np.zeros(var.shape)
     start_time = time.time()
-    res = least_squares(cost_func, var, method='trf',
-                        ftol=1e-19, xtol=1e-19, gtol=1e-19,
-                        bounds=(-10, 10), max_nfev=100,
+    res = least_squares(cost_func, var, method='lm',
+                        ftol=1e-15, xtol=1e-15, gtol=1e-15,
+                        max_nfev=1000,
                         args=(pts0, pts1, K, d, n_points, n_cameras))
     print("--- %s seconds ---" % (time.time() - start_time))
     print('Cost = {}'.format(np.linalg.norm(res.fun)))

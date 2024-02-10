@@ -8,7 +8,7 @@ def select_img_from_video(video_file, board_pattern, select_all=False, wait_msec
     video.set(cv.CAP_PROP_FOURCC, cv.VideoWriter_fourcc(*'MJPG')) # Set image format to MJPG/YUYV
     video.set(cv.CAP_PROP_AUTO_EXPOSURE, 1) # Set exposure to manual mode
     video.set(cv.CAP_PROP_AUTO_WB, 1)
-    video.set(cv.CAP_PROP_EXPOSURE , 1e2)
+    video.set(cv.CAP_PROP_EXPOSURE , 1e0)
     video.set(cv.CAP_PROP_FRAME_WIDTH, 2592)
     video.set(cv.CAP_PROP_FRAME_HEIGHT, 1944)
 
@@ -26,14 +26,14 @@ def select_img_from_video(video_file, board_pattern, select_all=False, wait_msec
             # Show the image
             display = img.copy()
             cv.putText(display, f'NSelect: {len(img_select)}', (10, 25), cv.FONT_HERSHEY_DUPLEX, 0.6, (0, 255, 0))
-            cv.imshow(wnd_name, display)
+            cv.imshow(wnd_name, cv.resize(display, (640, 480)))
 
             # Process the key event
             key = cv.waitKey(wait_msec)
             if key == ord(' '):             # Space: Pause and show corners
                 complete, pts = cv.findChessboardCorners(img, board_pattern)
                 cv.drawChessboardCorners(display, board_pattern, pts, complete)
-                cv.imshow(wnd_name, display)
+                cv.imshow(wnd_name, cv.resize(display, (640, 480)))
                 key = cv.waitKey()
                 if key == ord('\r'):
                     img_select.append(img) # Enter: Select the image
@@ -63,7 +63,7 @@ def calib_camera_from_chessboard(images, board_pattern, board_cellsize, K=None, 
 if __name__ == '__main__':
     video_file = '/dev/video0'
     board_pattern = (9, 6)
-    board_cellsize = 0.024
+    board_cellsize = 0.02475
 
     img_select = select_img_from_video(video_file, board_pattern)
     assert len(img_select) > 0, 'There is no selected images!'

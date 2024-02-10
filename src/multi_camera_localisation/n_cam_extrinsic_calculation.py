@@ -49,9 +49,9 @@ aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)
 aruco_params = cv2.aruco.DetectorParameters()
 detector = cv2.aruco.ArucoDetector(aruco_dict, aruco_params)
 # Camera matrix and distortion coefficients
-#K = np.float32([[1997.261510455484, 0, 1228.67838185292], # IMX335 4K
-#                [0, 1983.185627905062, 963.4249587878591],
-#                [0, 0, 1]])
+K = np.float32([[1997.261510455484, 0, 1228.67838185292], # IMX335 4K
+                [0, 1983.185627905062, 963.4249587878591],
+                [0, 0, 1]])
 K = np.float32([[2e3, 0, 1296],
                 [0, 2e3, 972],
                 [0, 0, 1]])
@@ -119,28 +119,29 @@ def project(points_3d, rvec, tvec, K):
     proj_points /= proj_points[2, np.newaxis]
     return proj_points[:, :2]
 
-def cost_func(var, pts, K, d, n_points, n_cameras):
+def cost_func(var, X, pts, K, d, n_points, n_cameras):
     ############################################################
     # Cost function reprojection
-    X = var[:n_points*3].reshape(n_points, 3)
-    rvecs = var[n_points*3:n_points*3+3*n_cameras].reshape(n_cameras, 3)
-    tvecs = var[-3*n_cameras:].reshape(n_cameras, 3)
+    rvecs = var[:n_cameras * 3].reshape(-1, 3)
+    tvecs = var[n_cameras * 3:].reshape(-1,3)
 
-    rvecs[0] = tvecs[0] = np.zeros(3)
     err = np.zeros((n_points*2, n_cameras))
     for i in range(n_cameras):
         proj = cv2.projectPoints(X, rvecs[i], tvecs[i], K, d)[0].reshape(-1,2)
-#        proj = project(X, rvecs[i], tvecs[i], K)
+#       proj = project(X, rvecs[i], tvecs[i], K)
         err[:,i] = (proj-pts[:,:,i]).ravel()
 
     return err.ravel()
 
-alpha = 0.1
+alpha = 0.05
 pts = np.zeros((n_points, 2, n_cameras))
 pts_prev = np.zeros((n_points, 2, n_cameras))
-X = np.ones((n_points, 3))
-rvecs = np.zeros((n_cameras, 3))
-tvecs = np.zeros((n_cameras, 3))
+board_pattern = (9, 6)
+board_cellsize = 0.02475
+X = [[c, r, 0] for r in range(board_pattern[1]) for c in range(board_pattern[0])]
+X = np.array(X, dtype=np.float32) * board_cellsize
+rvecs = np.random.rand(n_cameras, 3)
+tvecs = np.random.rand(n_cameras, 3)
 while True:
     ############################################################
     # Get and update points
@@ -156,12 +157,13 @@ while True:
     ############################################################
     # Optimization
     start_time = time.time()
-    var = np.concatenate([X.ravel(), rvecs.ravel(), tvecs.ravel()])
-    solution = least_squares(cost_func, var, method='trf',
-                             ftol=1e-15, loss='cauchy',
+    var = np.concatenate([rvecs.ravel(), tvecs.ravel()])
+    solution = least_squares(cost_func, var, args=(X, pts, K, d, n_points, n_cameras),
+                             method='trf',
+                             ftol=1e-15,
+                             loss='cauchy',
                              bounds=(-2, 2),
-                             max_nfev=100,
-                             args=(pts, K, d, n_points, n_cameras))
+                             max_nfev=1000)
     print('Cost = {}'.format(np.linalg.norm(solution.fun)))
     print("Time to optimize: %s" % (time.time() - start_time))
     optimized_vars = solution.x
@@ -172,15 +174,12 @@ while True:
     ############################################################
     # Recollect X, rvecs, tvecs from res
     start_time = time.time()
-    X = var[:n_points * 3].reshape(n_points, 3)
-    rvecs = var[n_points * 3:n_points * 3 + 3 * n_cameras].reshape(-1, 3)
-    tvecs = var[n_points * 3 + 3 * n_cameras:].reshape(-1,3)
-    print('Mean position of 3D points = {}'.format(np.mean(X, axis=0)))
+    rvecs = var[:n_cameras * 3].reshape(-1, 3)
+    tvecs = var[n_cameras * 3:].reshape(-1,3)
     # Print the 3D position, rotation vectors and translation vectors:
-#    for i in range(n_cameras):
-#        print('Rotation vector of camera {} = {}'.format(i, rvecs[i]))
-#        print('Translation vector of camera {} = {}'.format(i, tvecs[i]))
-#    print("3D Points = \n {}".format(X))
+    for i in range(n_cameras):
+        print('Rotation vector of camera {} = {}'.format(i, rvecs[i]))
+        print('Translation vector of camera {} = {}'.format(i, tvecs[i]))
     print("Time to recollect: %s" % (time.time() - start_time))
 
 ############################################################
