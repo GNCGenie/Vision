@@ -8,6 +8,45 @@ from copy import deepcopy
 import time
 from n_cam_extrinsic_calculation import getExtrinsics
 
+############################################################
+############################################################
+############################################################
+############################################################
+# Visualize the reconstructed 3D points
+plt.ion()
+fig = plt.figure()
+ax = fig.add_subplot(111, projection='3d')
+# Axis for plotting 3D points
+scatter = ax.scatter([], [], [], c='r', marker='o')
+ax.set_aspect('equal')
+ax.set_xlabel('X [m]')
+ax.set_ylabel('Y [m]')
+ax.set_zlabel('Z [m]')
+ax.set_xlim(-2.0, 2.0)
+ax.set_ylim(-2.0, 2.0)
+ax.set_zlim(-0.0, 2.0)
+ax.grid(True)
+# Axis for 2D plotting camera views
+ax2d_cam1 = fig.add_subplot(331)
+ax2d_cam2 = fig.add_subplot(333)
+ax2d_cam3 = fig.add_subplot(337)
+ax2d_cam4 = fig.add_subplot(339)
+for ax2d in [ax2d_cam1, ax2d_cam2, ax2d_cam3, ax2d_cam4]:
+    ax2d.set_aspect('equal')
+    ax2d.set_xlabel('X [pixels]')
+    ax2d.set_ylabel('Y [pixels]')
+    ax2d.grid(True)
+scatter2d_cam1 = ax2d_cam1.scatter([], [], c='r', marker='o')
+scatter2d_cam2 = ax2d_cam2.scatter([], [], c='r', marker='o')
+scatter2d_cam3 = ax2d_cam3.scatter([], [], c='r', marker='o')
+scatter2d_cam4 = ax2d_cam4.scatter([], [], c='r', marker='o')
+scatter2d = [scatter2d_cam1, scatter2d_cam2, scatter2d_cam3, scatter2d_cam4]
+plt.show()  # Show the initial plot
+############################################################
+############################################################
+############################################################
+############################################################
+
 def getPoints():
     ############################################################
     # Feature Detection
@@ -103,6 +142,7 @@ pts = np.zeros((n_points, 2, n_cameras))
 pts_prev = np.zeros((n_points, 2, n_cameras))
 X = np.ones((n_points, 3))
 rvecs,tvecs = getExtrinsics(video_captures, 54, 54, n_cameras)
+#rvecs,tvecs = np.random.rand(n_cameras, 3), np.random.rand(n_cameras, 3)
 cost = np.inf
 
 while True:
@@ -118,16 +158,28 @@ while True:
     print("Time to get points: %s" % (time.time() - start_time))
 
     ############################################################
+    # Triangulate points first for rough estimate
+    start_time = time.time()
+    R1 = cv2.Rodrigues(rvecs[0])[0]
+    P1 = K @ np.vstack((R1, tvecs[0])).T
+    R2 = cv2.Rodrigues(rvecs[1])[0]
+    P2 = K @ np.vstack((R2, tvecs[1])).T
+    X = cv2.triangulatePoints(P1, P2, pts[:,:,0].T, pts[:,:,1].T)
+    X /= X[3]
+    X = X[:3].T
+    print("Time to triangulate: %s" % (time.time() - start_time))
+
+    ############################################################
     # Optimization
     start_time = time.time()
-    if cost < 3e3:
-        var = np.concatenate([X.ravel()])
-    else:
-        var = np.random.rand(n_points * 3)
+    var = np.concatenate([X.ravel()])
+#    if cost < 3e3:
+#    else:
+#        var = np.random.rand(n_points * 3)
     solution = least_squares(cost_func, var, args=(rvecs, tvecs, pts, K, d, n_points, n_cameras),
-                             method='trf',
-                             loss='cauchy',
-                             bounds=(-2, 2),
+#                             method='trf',
+#                             loss='cauchy',
+#                             bounds=(-2, 2),
                              ftol=1e-15, xtol=1e-15, gtol=1e-15,
                              max_nfev=1000)
     cost = np.linalg.norm(solution.fun)
@@ -144,3 +196,23 @@ while True:
     X = var[:n_points * 3].reshape(n_points, 3)
     print('Mean position of 3D points = {}'.format(np.mean(X, axis=0)))
     print("Time to recollect: %s" % (time.time() - start_time))
+
+############################################################
+############################################################
+############################################################
+############################################################
+    # Add 2D points from cam1 and cam2 to the plot
+    for i,ax in zip(range(n_cameras), [ax2d_cam1, ax2d_cam2, ax2d_cam3, ax2d_cam4]):
+        ax.set_xlim(min(pts[:, 0, i]), max(pts[:, 0, i]))
+        ax.set_ylim(min(pts[:, 1, i]), max(pts[:, 1, i]))
+        # Set new data
+        scatter2d[i].set_offsets(pts[:, :, i])
+
+    # Add 3D points triangulated to the plot
+    scatter._offsets3d = (X[:,0], X[:,1], X[:,2])
+    plt.draw()  # Redraw the plot
+    plt.pause(0.001)
+############################################################
+############################################################
+############################################################
+############################################################

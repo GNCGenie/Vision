@@ -104,9 +104,9 @@ def getPoints():
         else:
             continue
 
-    # Join all images in display
-    disp = np.concatenate(disp, axis=1)
-    cv2.imshow('Display', disp)
+    # Join 4 images in disp in a 2x2 grid
+    disp_grid = np.vstack((np.hstack((disp[0], disp[1])), np.hstack((disp[2], disp[3]))))
+    cv2.imshow('Display', disp_grid)
     cv2.waitKey(1)
     return pts, active_cameras
 
