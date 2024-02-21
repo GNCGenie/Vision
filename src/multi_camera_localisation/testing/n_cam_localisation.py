@@ -142,7 +142,6 @@ pts = np.zeros((n_points, 2, n_cameras))
 pts_prev = np.zeros((n_points, 2, n_cameras))
 X = np.ones((n_points, 3))
 rvecs,tvecs = getExtrinsics(video_captures, 54, 54, n_cameras)
-#rvecs,tvecs = np.random.rand(n_cameras, 3), np.random.rand(n_cameras, 3)
 cost = np.inf
 
 while True:
@@ -159,23 +158,19 @@ while True:
 
     ############################################################
     # Triangulate points first for rough estimate
-    start_time = time.time()
-    R1 = cv2.Rodrigues(rvecs[0])[0]
-    P1 = K @ np.vstack((R1, tvecs[0])).T
-    R2 = cv2.Rodrigues(rvecs[1])[0]
-    P2 = K @ np.vstack((R2, tvecs[1])).T
-    X = cv2.triangulatePoints(P1, P2, pts[:,:,0].T, pts[:,:,1].T)
-    X /= X[3]
-    X = X[:3].T
-    print("Time to triangulate: %s" % (time.time() - start_time))
+    if cost > 1e3:
+        start_time = time.time()
+        P0 = K @ np.vstack((cv2.Rodrigues(rvecs[0])[0], tvecs[0])).T
+        P1 = K @ np.vstack((cv2.Rodrigues(rvecs[1])[0], tvecs[1])).T
+        X = cv2.triangulatePoints(P0, P1, pts[:,:,0].T, pts[:,:,1].T)
+        X /= X[3]
+        X = X[:3].T
+        print("Time to triangulate: %s" % (time.time() - start_time))
 
     ############################################################
     # Optimization
     start_time = time.time()
     var = np.concatenate([X.ravel()])
-#    if cost < 3e3:
-#    else:
-#        var = np.random.rand(n_points * 3)
     solution = least_squares(cost_func, var, args=(rvecs, tvecs, pts, K, d, n_points, n_cameras),
 #                             method='trf',
 #                             loss='cauchy',
