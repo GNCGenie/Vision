@@ -14,3 +14,6 @@ This repository houses the source code for a versatile vision library that facil
 .. figure:: _figures/flow_chart.png
     :alt: Data Flow Chart
     :width: 400
+
+.. toctree::
+   processing_flow
