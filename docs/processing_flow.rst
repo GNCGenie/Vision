@@ -1,4 +1,5 @@
-# Processing Flow and Description
+Processing Flow and Description
+==============================
 
 The localization of points in 3D space is addressed through two distinct sub-problems:
 
