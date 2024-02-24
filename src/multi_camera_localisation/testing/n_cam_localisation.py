@@ -55,6 +55,8 @@ def getPoints():
     disp=[]
     for i in range(n_cameras):
         _, image = video_captures[i]()
+        if image is None:
+            continue
         image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
         # Chessboard pattern detection
@@ -76,9 +78,9 @@ def getPoints():
             continue
 
     # Join 4 images in disp in a 2x2 grid
-    disp_grid = np.vstack((np.hstack((disp[0], disp[1])), np.hstack((disp[2], disp[3]))))
-    cv2.imshow('Display', disp_grid)
-    cv2.waitKey(1)
+#    disp_grid = np.vstack((np.hstack((disp[0], disp[1])), np.hstack((disp[2], disp[3]))))
+#    cv2.imshow('Display', disp_grid)
+#    cv2.waitKey(1)
     return pts, active_cameras
 
 def project(points_3d, rvec, tvec, K):
@@ -117,7 +119,7 @@ d = np.float32([-0.450,
                 -0.000,
                 -0.085])
 # Create lists to hold camera objects and video captures
-n_markers = 4
+n_markers = 1
 n_points = 4*n_markers
 n_cameras = 4  # Change this to the desired number of cameras
 # Initialize cameras and video captures

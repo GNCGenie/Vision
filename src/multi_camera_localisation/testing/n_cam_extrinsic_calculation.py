@@ -34,9 +34,9 @@ def getExtrinsics(video_captures, n_markers, n_points, n_cameras):
                 continue
 
         # Join all images in display
-        disp_grid = np.vstack((np.hstack((disp[0], disp[1])), np.hstack((disp[2], disp[3]))))
-        cv2.imshow('Display', disp_grid)
-        cv2.waitKey(1)
+#        disp_grid = np.vstack((np.hstack((disp[0], disp[1])), np.hstack((disp[2], disp[3]))))
+#        cv2.imshow('Display', disp_grid)
+#        cv2.waitKey(1)
         return pts, active_cameras
 
     def project(points_3d, rvec, tvec, K):

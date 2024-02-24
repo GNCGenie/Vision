@@ -3,7 +3,7 @@ import cv2
 from copy import deepcopy
 import time
 
-n_cameras = 4
+n_cameras = 1
 video_captures = []
 for i in range(0, 10):
     cam = cv2.VideoCapture(i)  # Adjust camera indices as needed
