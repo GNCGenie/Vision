@@ -17,3 +17,6 @@ This repository houses the source code for a versatile vision library that facil
 
 .. toctree::
    processing_flow
+
+.. toctree::
+   function_reference

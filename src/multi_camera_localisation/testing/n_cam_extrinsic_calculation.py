@@ -7,46 +7,31 @@ import cv2
 from copy import deepcopy
 import time
 
-def getExtrinsics(video_captures, n_markers, n_points, n_cameras):
-    def getPoints():
-        ############################################################
-        # Feature Detection
-        pts = np.zeros((n_points, 2, n_cameras))
-        active_cameras = 0
-
-        disp=[]
-        for i in range(n_cameras):
+def get_extrinsics(video_captures, n_markers, n_points, n_cameras):
+    n_cameras = len(video_captures)
+    import concurrent.futures
+    def get_points_parallel(pts):
+        active_cameras = []
+        def process_image(i):
             _, image = video_captures[i]()
+            if image is None:
+                return None
             image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-
             # Chessboard pattern detection
             board_pattern = (9,6)
             complete, pts_i = cv2.findChessboardCorners(image, board_pattern)
-
-            image = cv2.resize(image, (512, 384))
-            disp.append(image)
-
             if (pts_i is not None and len(pts_i) == n_markers):
                 pts_i = np.concatenate([arr.reshape(-1, 2) for arr in pts_i])
-                active_cameras += 1
+                active_cameras.append(i)
                 pts[:, :, i] = np.concatenate([arr.reshape(-1, 2) for arr in pts_i])
+                return pts_i
             else:
-                continue
-
-        # Join all images in display
-#        disp_grid = np.vstack((np.hstack((disp[0], disp[1])), np.hstack((disp[2], disp[3]))))
-#        cv2.imshow('Display', disp_grid)
-#        cv2.waitKey(1)
+                return None
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            futures = [executor.submit(process_image, i) for i in range(n_cameras)]
+            for i, future in enumerate(futures):
+                result = future.result()
         return pts, active_cameras
-
-    def project(points_3d, rvec, tvec, K):
-        ############################################################
-        # Projection 3D points to 2D for each camera
-        proj_points = Rotation.from_rotvec(rvec).apply(points_3d)
-        proj_points += tvec
-        proj_points = proj_points @ K.T
-        proj_points /= proj_points[2, np.newaxis]
-        return proj_points[:, :2]
 
     def cost_func(var, X, pts, K, d, n_points, n_cameras):
         ############################################################
@@ -57,7 +42,6 @@ def getExtrinsics(video_captures, n_markers, n_points, n_cameras):
         err = np.zeros((n_points*2, n_cameras))
         for i in range(n_cameras):
             proj = cv2.projectPoints(X, rvecs[i], tvecs[i], K, d)[0].reshape(-1,2)
-    #       proj = project(X, rvecs[i], tvecs[i], K)
             err[:,i] = (proj-pts[:,:,i]).ravel()
 
         return err.ravel()
@@ -77,10 +61,10 @@ def getExtrinsics(video_captures, n_markers, n_points, n_cameras):
     X = np.array(X, dtype=np.float32) * board_cellsize
 
     pts = np.zeros((n_points, 2, n_cameras))
-    pts, active_cameras = getPoints()
-    while active_cameras != n_cameras:
+    pts, active_cameras = get_points_parallel(pts)
+    while len(active_cameras) != n_cameras:
         print(f'Not enough active cameras {active_cameras}', end='\r')
-        pts, active_cameras = getPoints()
+        pts, active_cameras = get_points_parallel(pts)
     rvecs, tvecs = np.ones((n_cameras, 3)), np.ones((n_cameras, 3))
     # Initialise rvecs and tvecs by running solvePnP
     for i in range(n_cameras):
@@ -92,12 +76,12 @@ def getExtrinsics(video_captures, n_markers, n_points, n_cameras):
     alpha = 0.05
     pts_prev = deepcopy(pts)
     t0 = time.time()
-    while time.time() - t0 < 5:
+    while time.time() - t0 < 2:
         ############################################################
         # Get and update points
         start_time = time.time()
-        pts, active_cameras = getPoints()
-        if active_cameras < 2:
+        pts, active_cameras = get_points_parallel(pts)
+        if len(active_cameras) < 2:
             print(f'Not enough active cameras {active_cameras}', end='\r')
             continue
         pts = alpha * pts + (1 - alpha) * pts_prev
@@ -135,7 +119,7 @@ def getExtrinsics(video_captures, n_markers, n_points, n_cameras):
     return rvecs, tvecs
 
 if __name__ == '__main__':
-    n_cameras = 4
+    n_cameras = 3
     # Initialize cameras and video captures
     video_captures = []
     for i in range(0, 10):
@@ -153,6 +137,6 @@ if __name__ == '__main__':
             print(f'Connected to {video_captures} cameras')
             break
 
-    rvecs,tvecs = getExtrinsics(video_captures, 54, 54, n_cameras)
+    rvecs,tvecs = get_extrinsics(video_captures, 54, 54, n_cameras)
     print('rvecs = {}'.format(rvecs))
     print('tvecs = {}'.format(tvecs))
