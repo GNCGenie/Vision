@@ -27,8 +27,8 @@ Preserving the order of the cameras, we match points between the cameras by epip
 
 - **Low pass filter:** The detected points of chessboard pattern are passed through a low pass filter to reduce temporal noise. (Exponential averaging)
 - **Initialization:** 3D position is calculated pairwise between 2 cameras detecting same number of points.
--- **Undistort Points:** The points are undistorted before triangulation using camera Intrinsics.
--- **Triangulation:** The 3D position can be calculated using DLT (Direct Linear Transforms). # https://temugeb.github.io/computer_vision/2021/02/06/direct-linear-transorms.html
+    1. **Undistort Points:** The points are undistorted before triangulation using camera Intrinsics.
+    2. **Triangulation:** The 3D position can be calculated using DLT (Direct Linear Transforms). # https://temugeb.github.io/computer_vision/2021/02/06/direct-linear-transorms.html
 - **Bundle adjustment:** 3D points are further refined by minimizing reprojection error simultaneously between all cameras detecting the points.
 
 get_points_parallel
@@ -37,10 +37,10 @@ get_points_parallel
 Given a list of OpenCV camera capture object, this function calls all of them in parallel to get images.
 The images are passed through a detector which returns feature points.
 Features can be:
-- IR LEDs
-- Aruco markers
-- Chessboard pattern
-- Any other feature
+* IR LEDs
+* Aruco markers
+* Chessboard pattern
+* Any other feature
 
 cost_func
 ------------------------
