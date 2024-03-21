@@ -10,7 +10,7 @@ import time
 def get_extrinsics(video_captures, n_markers, n_points, n_cameras):
     n_cameras = len(video_captures)
     import concurrent.futures
-    def get_points_parallel(pts):
+    def get_chessboard_points_parallel(pts):
         active_cameras = []
         def process_image(i):
             _, image = video_captures[i]()
@@ -61,10 +61,10 @@ def get_extrinsics(video_captures, n_markers, n_points, n_cameras):
     X = np.array(X, dtype=np.float32) * board_cellsize
 
     pts = np.zeros((n_points, 2, n_cameras))
-    pts, active_cameras = get_points_parallel(pts)
+    pts, active_cameras = get_chessboard_points_parallel(pts)
     while len(active_cameras) != n_cameras:
         print(f'Not enough active cameras {active_cameras}', end='\r')
-        pts, active_cameras = get_points_parallel(pts)
+        pts, active_cameras = get_chessboard_points_parallel(pts)
     rvecs, tvecs = np.ones((n_cameras, 3)), np.ones((n_cameras, 3))
     # Initialise rvecs and tvecs by running solvePnP
     for i in range(n_cameras):
@@ -73,14 +73,14 @@ def get_extrinsics(video_captures, n_markers, n_points, n_cameras):
         tvec = tvec.reshape(3)
         rvecs[i], tvecs[i] = rvec, tvec
 
-    alpha = 0.05
+    alpha = 0.10
     pts_prev = deepcopy(pts)
     t0 = time.time()
-    while time.time() - t0 < 2:
+    while time.time() - t0 < 5:
         ############################################################
         # Get and update points
         start_time = time.time()
-        pts, active_cameras = get_points_parallel(pts)
+        pts, active_cameras = get_chessboard_points_parallel(pts)
         if len(active_cameras) < 2:
             print(f'Not enough active cameras {active_cameras}', end='\r')
             continue

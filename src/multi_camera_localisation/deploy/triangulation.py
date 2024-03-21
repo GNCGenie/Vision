@@ -1,3 +1,6 @@
+import numpy as np
+import cv2
+
 def project(points_3d, rvec, tvec, K):
     ############################################################
     # Projection 3D points to 2D for each camera

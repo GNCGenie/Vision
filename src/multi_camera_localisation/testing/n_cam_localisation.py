@@ -19,7 +19,6 @@ def get_points_parallel(pts, detector):
         image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         # Aruco marker detection
         pts_i, _, _ = detector.detectMarkers(image)
-        image = cv2.aruco.drawDetectedMarkers(image, pts_i)
         if (pts_i is not None and len(pts_i) == n_markers):
             pts_i = np.concatenate([arr.reshape(-1, 2) for arr in pts_i])
             active_cameras.append(i)
@@ -104,8 +103,6 @@ while True:
         start_time = time.time()
         X = np.zeros((n_points, 3))
         for i,j in itertools.combinations(active_cameras, 2):
-#            ptsi = pts[:,:,i]
-#            ptsj = pts[:,:,j]
             ptsi = cv2.undistortPoints(pts[:,:,i], K, d).reshape(-1,2)
             ptsj = cv2.undistortPoints(pts[:,:,j], K, d).reshape(-1,2)
             Pi = np.vstack((cv2.Rodrigues(rvecs[i])[0], tvecs[i])).T
@@ -115,7 +112,7 @@ while True:
             Xtmp = Xtmp[:3].T
             X += Xtmp
         print("Time to triangulate: %s" % (time.time() - start_time))
-        X = X / n_cameras
+        X = X / len(active_cameras)
 
     ############################################################
     # Optimization

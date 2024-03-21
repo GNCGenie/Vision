@@ -1,3 +1,6 @@
+import cv2
+import numpy as np
+
 import concurrent.futures
 def get_points_parallel(n_cameras, n_markers, detector, video_captures):
     active_cameras = 0
@@ -11,7 +14,6 @@ def get_points_parallel(n_cameras, n_markers, detector, video_captures):
         image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         # Aruco marker detection
         pts_i, _, _ = detector.detectMarkers(image)
-        image = cv2.aruco.drawDetectedMarkers(image, pts_i)
         if (pts_i is not None and len(pts_i) == n_markers):
             pts_i = np.concatenate([arr.reshape(-1, 2) for arr in pts_i])
             active_cameras += 1
@@ -46,6 +48,11 @@ def init_cameras(n_cameras):
 
         return video_captures
 
-# Initialize cameras and video captures
-n_cameras = 3  # Change this to the desired number of cameras
-video_captures = init_cameras(n_cameras)
+aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)
+aruco_params = cv2.aruco.DetectorParameters()
+detector = cv2.aruco.ArucoDetector(aruco_dict, aruco_params)
+
+if __name__ == '__main__':
+    n_cameras = 3
+    video_captures = init_cameras(n_cameras)
+    pts, active_cameras = get_points_parallel(n_cameras, 2, detector, video_captures)
