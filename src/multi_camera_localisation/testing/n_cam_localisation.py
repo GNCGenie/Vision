@@ -8,6 +8,22 @@ from n_cam_extrinsic_calculation import get_extrinsics
 from plotting import *
 
 import concurrent.futures
+
+def get_images_parallel(video_captures):
+    images = [None for i in range(len(video_captures))]
+    def get_image(i):
+        _, image = video_captures[i]()
+        if image is None:
+            return None
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        images[i] = image
+        return image
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        futures = [executor.submit(get_image, i) for i in range(len(video_captures))]
+        for i, future in enumerate(futures):
+            result = future.result()
+    return images
+
 def get_points_parallel(pts, detector):
     active_cameras = []
     n_cameras = len(pts[0, 0, :])
@@ -30,6 +46,7 @@ def get_points_parallel(pts, detector):
         futures = [executor.submit(process_image, i) for i in range(n_cameras)]
         for i, future in enumerate(futures):
             result = future.result()
+    active_cameras.sort()
     return pts, active_cameras
 
 def cost_func(var, rvecs, tvecs, pts, K, d, n_points, n_cameras):
@@ -76,7 +93,7 @@ for i in range(0, 10):
         break
 
 # Create lists to hold camera objects and video captures
-n_markers = 1
+n_markers = 1 # Change this to set the no. of markers that are going to be detected in the scene
 n_points = 4*n_markers
 alpha = 0.1
 pts = np.zeros((n_points, 2, n_cameras))
@@ -118,8 +135,9 @@ while True:
     # Optimization
     start_time = time.time()
     var = np.concatenate([X.ravel()])
-    solution = least_squares(cost_func, var, args=(rvecs, tvecs, pts,
-                                                   K, d, n_points, n_cameras),
+    solution = least_squares(cost_func, var, args=(rvecs[active_cameras], tvecs[active_cameras],
+                                                   pts[:,:,active_cameras], K, d,
+                                                   n_points, len(active_cameras)),
 #                             method='trf',
 #                             bounds=(-1e2, 1e2),
 #                             loss='cauchy',

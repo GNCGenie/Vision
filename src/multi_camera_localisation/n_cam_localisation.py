@@ -1,99 +1,27 @@
 import numpy as np
-import matplotlib.pyplot as plt
 from scipy.optimize import least_squares
-from scipy.optimize import minimize
 from scipy.spatial.transform import Rotation
 import cv2
-from copy import deepcopy
 import time
-from n_cam_extrinsic_calculation import getExtrinsics
-
-############################################################
-############################################################
-############################################################
-############################################################
-# Visualize the reconstructed 3D points
-plt.ion()
-fig = plt.figure()
-ax = fig.add_subplot(111, projection='3d')
-# Axis for plotting 3D points
-scatter = ax.scatter([], [], [], c='r', marker='o')
-ax.set_aspect('equal')
-ax.set_xlabel('X [m]')
-ax.set_ylabel('Y [m]')
-ax.set_zlabel('Z [m]')
-ax.set_xlim(-2.0, 2.0)
-ax.set_ylim(-2.0, 2.0)
-ax.set_zlim(-0.0, 2.0)
-ax.grid(True)
-# Axis for 2D plotting camera views
-ax2d_cam1 = fig.add_subplot(331)
-ax2d_cam2 = fig.add_subplot(333)
-ax2d_cam3 = fig.add_subplot(337)
-ax2d_cam4 = fig.add_subplot(339)
-for ax2d in [ax2d_cam1, ax2d_cam2, ax2d_cam3, ax2d_cam4]:
-    ax2d.set_aspect('equal')
-    ax2d.set_xlabel('X [pixels]')
-    ax2d.set_ylabel('Y [pixels]')
-    ax2d.grid(True)
-scatter2d_cam1 = ax2d_cam1.scatter([], [], c='r', marker='o')
-scatter2d_cam2 = ax2d_cam2.scatter([], [], c='r', marker='o')
-scatter2d_cam3 = ax2d_cam3.scatter([], [], c='r', marker='o')
-scatter2d_cam4 = ax2d_cam4.scatter([], [], c='r', marker='o')
-scatter2d = [scatter2d_cam1, scatter2d_cam2, scatter2d_cam3, scatter2d_cam4]
-plt.show()  # Show the initial plot
-############################################################
-############################################################
-############################################################
-############################################################
-def get_points(pts):
-    ############################################################
-    # Feature Detection
-    active_cameras = 0
-    disp=[]
-    for i in range(n_cameras):
-        _, image = video_captures[i]()
-        if image is None:
-            continue
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        # Chessboard pattern detection
-#       board_pattern = (9,6)
-#       complete, pts_i = cv2.findChessboardCorners(image, board_pattern)
-        # Aruco marker detection
-        pts_i, _, _ = detector.detectMarkers(image)
-        image = cv2.aruco.drawDetectedMarkers(image, pts_i)
-        image = cv2.resize(image, (512, 384))
-        disp.append(image)
-        if (pts_i is not None and len(pts_i) == n_markers):
-            pts_i = np.concatenate([arr.reshape(-1, 2) for arr in pts_i])
-            active_cameras += 1
-            pts[:, :, i] = np.concatenate([arr.reshape(-1, 2) for arr in pts_i])
-        else:
-            continue
-    # Join 4 images in disp in a 2x2 grid
-#    disp_grid = np.vstack((np.hstack((disp[0], disp[1])), np.hstack((disp[2], disp[3]))))
-#    cv2.imshow('Display', disp_grid)
-#    cv2.waitKey(1)
-    return pts, active_cameras
+import itertools
+from n_cam_extrinsic_calculation import get_extrinsics
+from plotting import *
 
 import concurrent.futures
-def get_points_parallel(pts):
-    active_cameras = 0
-    disp = []
+def get_points_parallel(pts, detector):
+    active_cameras = []
+    n_cameras = len(pts[0, 0, :])
+    n_points = len(pts[:, 0, 0])
     def process_image(i):
-        nonlocal active_cameras
         _, image = video_captures[i]()
         if image is None:
             return None
         image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         # Aruco marker detection
         pts_i, _, _ = detector.detectMarkers(image)
-        image = cv2.aruco.drawDetectedMarkers(image, pts_i)
-        image = cv2.resize(image, (512, 384))
-        disp.append(image)
         if (pts_i is not None and len(pts_i) == n_markers):
             pts_i = np.concatenate([arr.reshape(-1, 2) for arr in pts_i])
-            active_cameras += 1
+            active_cameras.append(i)
             pts[:, :, i] = np.concatenate([arr.reshape(-1, 2) for arr in pts_i])
             return pts_i
         else:
@@ -102,19 +30,8 @@ def get_points_parallel(pts):
         futures = [executor.submit(process_image, i) for i in range(n_cameras)]
         for i, future in enumerate(futures):
             result = future.result()
-#    disp_grid = np.vstack((np.hstack((disp[0], disp[1])), np.hstack((disp[2], disp[3]))))
-#    cv2.imshow('Display', disp_grid)
-#    cv2.waitKey(1)
+    active_cameras.sort()
     return pts, active_cameras
-
-def project(points_3d, rvec, tvec, K):
-    ############################################################
-    # Projection 3D points to 2D for each camera
-    proj_points = Rotation.from_rotvec(rvec).apply(points_3d)
-    proj_points += tvec
-    proj_points = proj_points @ K.T
-    proj_points /= proj_points[2, np.newaxis]
-    return proj_points[:, :2]
 
 def cost_func(var, rvecs, tvecs, pts, K, d, n_points, n_cameras):
     ############################################################
@@ -124,7 +41,6 @@ def cost_func(var, rvecs, tvecs, pts, K, d, n_points, n_cameras):
     err = np.zeros((n_points*2, n_cameras))
     for i in range(n_cameras):
         proj = cv2.projectPoints(X, rvecs[i], tvecs[i], K, d)[0].reshape(-1,2)
-#       proj = project(X, rvecs[i], tvecs[i], K)
         err[:,i] = (proj-pts[:,:,i]).ravel()
 
     return err.ravel()
@@ -167,16 +83,15 @@ alpha = 0.1
 pts = np.zeros((n_points, 2, n_cameras))
 pts_prev = np.zeros((n_points, 2, n_cameras))
 X = np.ones((n_points, 3))
-rvecs,tvecs = getExtrinsics(video_captures, 54, 54, n_cameras)
+rvecs,tvecs = get_extrinsics(video_captures, 54, 54, n_cameras)
 cost = np.inf
 
 while True:
     ############################################################
     # Get and update points
     start_time = time.time()
-#    pts, active_cameras = get_points()
-    pts, active_cameras = get_points_parallel(pts)
-    if active_cameras < 2:
+    pts, active_cameras = get_points_parallel(pts, detector)
+    if len(active_cameras) < 2:
         print(f'Not enough active cameras {active_cameras}', end='\r')
         continue
     pts = alpha * pts + (1 - alpha) * pts_prev
@@ -187,31 +102,28 @@ while True:
     # Triangulate points first for rough estimate
     if cost > 1e2:
         start_time = time.time()
-        P0 = K @ np.vstack((cv2.Rodrigues(rvecs[0])[0], tvecs[0])).T
-        P1 = K @ np.vstack((cv2.Rodrigues(rvecs[1])[0], tvecs[1])).T
-        X = cv2.triangulatePoints(P0, P1, pts[:,:,0].T, pts[:,:,1].T)
-        X /= X[3]
-        X = X[:3].T
+        X = np.zeros((n_points, 3))
+        for i,j in itertools.combinations(active_cameras, 2):
+            ptsi = cv2.undistortPoints(pts[:,:,i], K, d).reshape(-1,2)
+            ptsj = cv2.undistortPoints(pts[:,:,j], K, d).reshape(-1,2)
+            Pi = np.vstack((cv2.Rodrigues(rvecs[i])[0], tvecs[i])).T
+            Pj = np.vstack((cv2.Rodrigues(rvecs[j])[0], tvecs[j])).T
+            Xtmp = cv2.triangulatePoints(Pi, Pj, ptsi.T, ptsj.T)
+            Xtmp /= Xtmp[3]
+            Xtmp = Xtmp[:3].T
+            X += Xtmp
         print("Time to triangulate: %s" % (time.time() - start_time))
-
-    if cost > 1e2:
-        start_time = time.time()
-        for i,j in itertools.combinations(range(n_cameras), 2):
-            P0 = K @ np.vstack((cv2.Rodrigues(rvecs[i])[0], tvecs[i])).T
-            P1 = K @ np.vstack((cv2.Rodrigues(rvecs[j])[0], tvecs[j])).T
-            X = cv2.triangulatePoints(P0, P1, pts[:,:,i].T, pts[:,:,j].T)
-            X /= X[3]
-            X = X[:3].T
-            print("Time to triangulate: %s" % (time.time() - start_time))
+        X = X / len(active_cameras)
 
     ############################################################
     # Optimization
     start_time = time.time()
     var = np.concatenate([X.ravel()])
-    solution = least_squares(cost_func, var, args=(rvecs, tvecs, pts, K, d, n_points, n_cameras),
+    solution = least_squares(cost_func, var, args=(rvecs, tvecs, pts,
+                                                   K, d, n_points, n_cameras),
 #                             method='trf',
+#                             bounds=(-1e2, 1e2),
 #                             loss='cauchy',
-#                             bounds=(-2, 2),
                              ftol=1e-15, xtol=1e-15, gtol=1e-15,
                              max_nfev=1000)
     cost = np.linalg.norm(solution.fun)
@@ -223,28 +135,11 @@ while True:
     var = optimized_vars
 
     ############################################################
-    # Recollect X, rvecs, tvecs from res
+    # Recollect X from res
     start_time = time.time()
     X = var[:n_points * 3].reshape(n_points, 3)
     print('Mean position of 3D points = {}'.format(np.mean(X, axis=0)))
     print("Time to recollect: %s" % (time.time() - start_time))
 
-############################################################
-############################################################
-############################################################
-############################################################
-    # Add 2D points from cam1 and cam2 to the plot
-    for i,ax in zip(range(n_cameras), [ax2d_cam1, ax2d_cam2, ax2d_cam3, ax2d_cam4]):
-        ax.set_xlim(min(pts[:, 0, i]), max(pts[:, 0, i]))
-        ax.set_ylim(min(pts[:, 1, i]), max(pts[:, 1, i]))
-        # Set new data
-        scatter2d[i].set_offsets(pts[:, :, i])
-
-    # Add 3D points triangulated to the plot
-    scatter._offsets3d = (X[:,0], X[:,1], X[:,2])
-    plt.draw()  # Redraw the plot
-    plt.pause(0.001)
-############################################################
-############################################################
-############################################################
-############################################################
+    ############################################################
+    visualize(pts, X)

@@ -76,7 +76,7 @@ def get_extrinsics(video_captures, n_markers, n_points, n_cameras):
     alpha = 0.10
     pts_prev = deepcopy(pts)
     t0 = time.time()
-    while time.time() - t0 < 5:
+    while time.time() - t0 < 2:
         ############################################################
         # Get and update points
         start_time = time.time()
