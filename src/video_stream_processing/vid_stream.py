@@ -5,7 +5,7 @@ import time
 
 def load_cameras(n_cameras):
     video_captures = []
-    for i in range(0, 10):
+    for i in range(0, 20):
         cam = cv2.VideoCapture(i)  # Adjust camera indices as needed
         # Capture cam reading error
         if not cam.isOpened():
@@ -62,7 +62,8 @@ while True:
     time_end = time.time()
     print('Time taken to read frame:', time_end - time_start, 'seconds')
 
-    # Join all images in display
+    # Join all images in display into a 3x2 array
+    disp = np.array(disp)
     disp = np.concatenate(disp, axis=1)
     cv2.imshow('Display', disp)
     if cv2.waitKey(1) & 0xFF == ord('q'):

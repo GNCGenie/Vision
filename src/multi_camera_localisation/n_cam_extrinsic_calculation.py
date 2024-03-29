@@ -49,11 +49,11 @@ def get_extrinsics(video_captures, n_markers, n_points, n_cameras):
     K = np.float32([[2e3, 0, 1296],
                     [0, 2e3, 972],
                     [0, 0, 1]])
-    d = np.float32([-0.45,
-                     0.25,
-                    -0.00,
-                    -0.00,
-                    -0.08])
+    d = np.float32([-0.450,
+                    0.2553,
+                    -0.000,
+                    -0.000,
+                    -0.085])
 
     board_pattern = (9, 6)
     board_cellsize = 0.02475
@@ -76,7 +76,7 @@ def get_extrinsics(video_captures, n_markers, n_points, n_cameras):
     alpha = 0.10
     pts_prev = deepcopy(pts)
     t0 = time.time()
-    while time.time() - t0 < 5:
+    while time.time() - t0 < 2:
         ############################################################
         # Get and update points
         start_time = time.time()

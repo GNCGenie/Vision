@@ -8,22 +8,6 @@ from n_cam_extrinsic_calculation import get_extrinsics
 from plotting import *
 
 import concurrent.futures
-
-def get_images_parallel(video_captures):
-    images = [None for i in range(len(video_captures))]
-    def get_image(i):
-        _, image = video_captures[i]()
-        if image is None:
-            return None
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        images[i] = image
-        return image
-    with concurrent.futures.ThreadPoolExecutor() as executor:
-        futures = [executor.submit(get_image, i) for i in range(len(video_captures))]
-        for i, future in enumerate(futures):
-            result = future.result()
-    return images
-
 def get_points_parallel(pts, detector):
     active_cameras = []
     n_cameras = len(pts[0, 0, :])
@@ -35,10 +19,9 @@ def get_points_parallel(pts, detector):
         image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         # Aruco marker detection
         pts_i, _, _ = detector.detectMarkers(image)
-        if (pts_i is not None and len(pts_i) == n_markers):
-            pts_i = np.concatenate([arr.reshape(-1, 2) for arr in pts_i])
+        if (pts_i is not None and len(pts_i) == n_points):
             active_cameras.append(i)
-            pts[:, :, i] = np.concatenate([arr.reshape(-1, 2) for arr in pts_i])
+            pts[:, :, i] = np.concatenate([np.mean(arr, axis=1) for arr in pts_i])
             return pts_i
         else:
             return None
@@ -66,36 +49,37 @@ aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)
 aruco_params = cv2.aruco.DetectorParameters()
 detector = cv2.aruco.ArucoDetector(aruco_dict, aruco_params)
 # Camera matrix and distortion coefficients
-K = np.float32([[2e3, 0, 1296],
-                [0, 2e3, 972],
+resX, resY = 2592, 1944
+fx = fy = 2e3
+K = np.float32([[fx, 0, resX/2],
+                [0, fy, resY/2],
                 [0, 0, 1]])
-d = np.float32([-0.450,
-                0.2553,
-                -0.000,
-                -0.000,
-                -0.085])
+d = np.float32([-0.45,
+                0.255,
+                -0.00,
+                -0.00,
+                -0.08])
 # Initialize cameras and video captures
 n_cameras = 3  # Change this to the desired number of cameras
 video_captures = []
-for i in range(0, 10):
+for i in range(0, 20):
     cam = cv2.VideoCapture(i)  # Adjust camera indices as needed
     # Capture cam reading error
     if not cam.isOpened():
         continue
     cam.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
     cam.set(cv2.CAP_PROP_AUTO_EXPOSURE, 1)
-    cam.set(cv2.CAP_PROP_EXPOSURE , 1e0)
-    cam.set(cv2.CAP_PROP_FRAME_WIDTH, 2592)
-    cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 1944)
+    cam.set(cv2.CAP_PROP_EXPOSURE , 1e0) # Change if too dark or too bright
+    cam.set(cv2.CAP_PROP_FRAME_WIDTH, resX)
+    cam.set(cv2.CAP_PROP_FRAME_HEIGHT, resY)
     video_captures.append(cam.read)  # Capture initial frames
     if len(video_captures) == n_cameras:
         print(f'Connected to {video_captures} cameras')
         break
 
 # Create lists to hold camera objects and video captures
-n_markers = 1 # Change this to set the no. of markers that are going to be detected in the scene
-n_points = 4*n_markers
-alpha = 0.1
+n_points = 1 # Change this to set the no. of markers/LEDs that are going to be detected in the scene
+alpha = 0.10
 pts = np.zeros((n_points, 2, n_cameras))
 pts_prev = np.zeros((n_points, 2, n_cameras))
 X = np.ones((n_points, 3))
@@ -112,12 +96,12 @@ while True:
         continue
     pts = alpha * pts + (1 - alpha) * pts_prev
     pts_prev = pts
-    print("Time to get points: %s" % (time.time() - start_time))
+#    print("Time to get points: %s" % (time.time() - start_time))
 
     ############################################################
     # Triangulate points first for rough estimate
     if cost > 1e2:
-        start_time = time.time()
+#        start_time = time.time()
         X = np.zeros((n_points, 3))
         for i,j in itertools.combinations(active_cameras, 2):
             ptsi = cv2.undistortPoints(pts[:,:,i], K, d).reshape(-1,2)
@@ -128,35 +112,34 @@ while True:
             Xtmp /= Xtmp[3]
             Xtmp = Xtmp[:3].T
             X += Xtmp
-        print("Time to triangulate: %s" % (time.time() - start_time))
+#        print("Time to triangulate: %s" % (time.time() - start_time))
         X = X / len(active_cameras)
 
     ############################################################
     # Optimization
-    start_time = time.time()
+#    start_time = time.time()
     var = np.concatenate([X.ravel()])
     solution = least_squares(cost_func, var, args=(rvecs[active_cameras], tvecs[active_cameras],
                                                    pts[:,:,active_cameras], K, d,
                                                    n_points, len(active_cameras)),
 #                             method='trf',
-#                             bounds=(-1e2, 1e2),
+#                             bounds=(-1e1, 1e1),
 #                             loss='cauchy',
                              ftol=1e-15, xtol=1e-15, gtol=1e-15,
                              max_nfev=1000)
     cost = np.linalg.norm(solution.fun)
-    print('Cost = {}'.format(cost))
-    print("Time to optimize: %s" % (time.time() - start_time))
     optimized_vars = solution.x
     if np.isnan(optimized_vars).any() or np.isinf(optimized_vars).any():
         continue # If any values in res are NaN or Inf, continue
     var = optimized_vars
+#    print("Time to optimize: %s" % (time.time() - start_time))
+    print('Cost = {}'.format(cost), end='\t')
 
     ############################################################
     # Recollect X from res
-    start_time = time.time()
     X = var[:n_points * 3].reshape(n_points, 3)
-    print('Mean position of 3D points = {}'.format(np.mean(X, axis=0)))
-    print("Time to recollect: %s" % (time.time() - start_time))
+    print("Time to complete: %s" % (time.time() - start_time), end='\t')
+    print('Position of 3D points = {}'.format(X), end='\n')
 
     ############################################################
-    visualize(pts, X)
+#    visualize(pts, X)
