@@ -1,13 +1,10 @@
 import numpy as np
-import matplotlib.pyplot as plt
 from scipy.optimize import least_squares
-from scipy.optimize import minimize
-from scipy.spatial.transform import Rotation
 import cv2
 from copy import deepcopy
 import time
 
-def get_extrinsics(video_captures, n_markers, n_points, n_cameras):
+def get_extrinsics(video_captures, n_points, n_cameras):
     n_cameras = len(video_captures)
     import concurrent.futures
     def get_chessboard_points_parallel(pts):
@@ -16,11 +13,11 @@ def get_extrinsics(video_captures, n_markers, n_points, n_cameras):
             _, image = video_captures[i]()
             if image is None:
                 return None
-            image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+#            image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
             # Chessboard pattern detection
             board_pattern = (9,6)
             complete, pts_i = cv2.findChessboardCorners(image, board_pattern)
-            if (pts_i is not None and len(pts_i) == n_markers):
+            if (pts_i is not None and len(pts_i) == n_points):
                 pts_i = np.concatenate([arr.reshape(-1, 2) for arr in pts_i])
                 active_cameras.append(i)
                 pts[:, :, i] = np.concatenate([arr.reshape(-1, 2) for arr in pts_i])
@@ -36,7 +33,7 @@ def get_extrinsics(video_captures, n_markers, n_points, n_cameras):
     def cost_func(var, X, pts, K, d, n_points, n_cameras):
         ############################################################
         # Cost function reprojection
-        rvecs = var[:n_cameras * 3].reshape(-1, 3)
+        rvecs = var[:n_cameras * 3].reshape(-1,3)
         tvecs = var[n_cameras * 3:].reshape(-1,3)
 
         err = np.zeros((n_points*2, n_cameras))
@@ -49,14 +46,14 @@ def get_extrinsics(video_captures, n_markers, n_points, n_cameras):
     K = np.float32([[2e3, 0, 1296],
                     [0, 2e3, 972],
                     [0, 0, 1]])
-    d = np.float32([-0.450,
-                    0.2553,
-                    -0.000,
-                    -0.000,
-                    -0.085])
+    d = np.float32([-0.45,
+                     0.25,
+                    -0.00,
+                    -0.00,
+                    -0.08])
 
     board_pattern = (9, 6)
-    board_cellsize = 0.02475
+    board_cellsize = 0.02475 # In metre
     X = [[c, r, 0] for r in range(board_pattern[1]) for c in range(board_pattern[0])]
     X = np.array(X, dtype=np.float32) * board_cellsize
 
@@ -76,7 +73,7 @@ def get_extrinsics(video_captures, n_markers, n_points, n_cameras):
     alpha = 0.10
     pts_prev = deepcopy(pts)
     t0 = time.time()
-    while time.time() - t0 < 2:
+    while time.time() - t0 < 0:
         ############################################################
         # Get and update points
         start_time = time.time()
@@ -137,6 +134,6 @@ if __name__ == '__main__':
             print(f'Connected to {video_captures} cameras')
             break
 
-    rvecs,tvecs = get_extrinsics(video_captures, 54, 54, n_cameras)
+    rvecs,tvecs = get_extrinsics(video_captures, 54, n_cameras)
     print('rvecs = {}'.format(rvecs))
     print('tvecs = {}'.format(tvecs))

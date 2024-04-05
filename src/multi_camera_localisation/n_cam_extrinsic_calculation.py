@@ -56,7 +56,7 @@ def get_extrinsics(video_captures, n_markers, n_points, n_cameras):
                     -0.085])
 
     board_pattern = (9, 6)
-    board_cellsize = 0.02475
+    board_cellsize = 0.02475 # In metre
     X = [[c, r, 0] for r in range(board_pattern[1]) for c in range(board_pattern[0])]
     X = np.array(X, dtype=np.float32) * board_cellsize
 

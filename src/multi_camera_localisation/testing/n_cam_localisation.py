@@ -1,13 +1,25 @@
 import numpy as np
 from scipy.optimize import least_squares
-from scipy.spatial.transform import Rotation
 import cv2
 import time
 import itertools
+from copy import deepcopy
 from n_cam_extrinsic_calculation import get_extrinsics
-from plotting import *
-
 import concurrent.futures
+
+def get_image_parallel(video_captures):
+    n_cameras = len(video_captures)
+    disp=[]
+    def process_image(i):
+        _, image = video_captures[i].read()
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        return image
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        futures = [executor.submit(process_image, i) for i in range(n_cameras)]
+        for i, future in enumerate(futures):
+            disp.append(future.result())
+    return np.array(disp)
+
 def get_points_parallel(pts, detector):
     active_cameras = []
     n_cameras = len(pts[0, 0, :])
@@ -16,13 +28,12 @@ def get_points_parallel(pts, detector):
         _, image = video_captures[i]()
         if image is None:
             return None
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+#        image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         # Aruco marker detection
         pts_i, _, _ = detector.detectMarkers(image)
         if (pts_i is not None and len(pts_i) == n_points):
             active_cameras.append(i)
             pts[:, :, i] = np.concatenate([np.mean(arr, axis=1) for arr in pts_i])
-            return pts_i
         else:
             return None
     with concurrent.futures.ThreadPoolExecutor() as executor:
@@ -30,7 +41,7 @@ def get_points_parallel(pts, detector):
         for i, future in enumerate(futures):
             result = future.result()
     active_cameras.sort()
-    return pts, active_cameras
+    return active_cameras
 
 def cost_func(var, rvecs, tvecs, pts, K, d, n_points, n_cameras):
     ############################################################
@@ -55,7 +66,7 @@ K = np.float32([[fx, 0, resX/2],
                 [0, fy, resY/2],
                 [0, 0, 1]])
 d = np.float32([-0.45,
-                0.255,
+                 0.25,
                 -0.00,
                 -0.00,
                 -0.08])
@@ -76,26 +87,29 @@ for i in range(0, 20):
     if len(video_captures) == n_cameras:
         print(f'Connected to {video_captures} cameras')
         break
+if len(video_captures) != n_cameras:
+    print(f'Failed to connect to {n_cameras} cameras')
+    exit()
 
-# Create lists to hold camera objects and video captures
+rvecs,tvecs = get_extrinsics(video_captures, 54, n_cameras)
 n_points = 1 # Change this to set the no. of markers/LEDs that are going to be detected in the scene
-alpha = 0.10
+alpha = 0.50
 pts = np.zeros((n_points, 2, n_cameras))
-pts_prev = np.zeros((n_points, 2, n_cameras))
+get_points_parallel(pts, detector)
+pts_prev = deepcopy(pts)
 X = np.ones((n_points, 3))
-rvecs,tvecs = get_extrinsics(video_captures, 54, 54, n_cameras)
 cost = np.inf
 
 while True:
     ############################################################
     # Get and update points
     start_time = time.time()
-    pts, active_cameras = get_points_parallel(pts, detector)
+    active_cameras = get_points_parallel(pts, detector)
     if len(active_cameras) < 2:
         print(f'Not enough active cameras {active_cameras}', end='\r')
         continue
     pts = alpha * pts + (1 - alpha) * pts_prev
-    pts_prev = pts
+    pts_prev = deepcopy(pts)
 #    print("Time to get points: %s" % (time.time() - start_time))
 
     ############################################################
@@ -133,13 +147,13 @@ while True:
         continue # If any values in res are NaN or Inf, continue
     var = optimized_vars
 #    print("Time to optimize: %s" % (time.time() - start_time))
-    print('Cost = {}'.format(cost), end='\t')
+    print('Cost = {}'.format(round(cost, 3)), end='\t')
 
     ############################################################
     # Recollect X from res
     X = var[:n_points * 3].reshape(n_points, 3)
-    print("Time to complete: %s" % (time.time() - start_time), end='\t')
-    print('Position of 3D points = {}'.format(X), end='\n')
+    print("Time to complete: %s" % round(time.time() - start_time, 3), end='\t')
+    print('Position of 3D points = {}'.format(np.round(X, 3), end='\n'))
 
     ############################################################
 #    visualize(pts, X)

@@ -15,19 +15,13 @@ def load_cameras(n_cameras):
         cam.set(cv2.CAP_PROP_EXPOSURE , 1e0)
         cam.set(cv2.CAP_PROP_FRAME_WIDTH, 2592)
         cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 1944)
-        video_captures.append(cam)
+
+        _, image = cam.read()
+        if image is not None:
+            video_captures.append(cam)
         if len(video_captures) == n_cameras:
             break
     return video_captures
-
-def get_image(video_captures):
-    disp=[]
-    for i in range(n_cameras):
-        _, image = video_captures[i].read()
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        image = cv2.resize(image, (512, 384))
-        disp.append(image)
-    return disp
 
 import concurrent.futures
 def get_image_parallel(video_captures):
@@ -50,9 +44,9 @@ release = False
 while True:
     # Measure time taken to read frame
     time_start = time.time()
-    disp = get_image_parallel(video_captures, release)
+    disp = get_image_parallel(video_captures)
     time_end = time.time()
-    print('Time taken to read frame:', time_end - time_start, 'seconds')
+    print('Time taken to read frame:', round(time_end - time_start, 3), 'seconds')
 
     # Join all images in display into a 3x2 array
     disp = np.array(disp)
